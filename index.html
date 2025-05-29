@@ -14,14 +14,17 @@
             font-family: Arial;
         }
         canvas {
+            display: block;
             border: 2px solid #333;
         }
         #score {
-            position: absolute;
+            position: fixed;
             top: 10px;
             left: 10px;
             color: white;
             font-size: 20px;
+            z-index: 100;
+            text-shadow: 1px 1px 2px black;
         }
     </style>
 </head>
@@ -35,37 +38,48 @@
         const scoreElement = document.getElementById('score');
 
         // Настройки игры
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Камера
+        let camera = {
+            x: 0,
+            y: 0,
+            width: canvas.width,
+            height: canvas.height
+        };
 
         // Игрок
         let player = {
-            x: centerX,
-            y: centerY,
+            x: 0,
+            y: 0,
             radius: 10,
             speed: 3,
             angle: 0,
             tail: [],
             length: 5,
-            score: 0
+            score: 0,
+            color: '#FFFFFF'
         };
 
         // Еда
         let food = [];
-        const foodCount = 50;
+        const foodCount = 100;
 
-        // Враги (другие змейки)
+        // Враги
         let enemies = [];
-        const enemyCount = 5;
+        const enemyCount = 10;
 
         // Генерация еды
         function generateFood() {
             for (let i = 0; i < foodCount; i++) {
                 food.push({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height,
+                    x: Math.random() * 2000 - 1000,
+                    y: Math.random() * 2000 - 1000,
                     radius: 5,
                     color: `hsl(${Math.random() * 360}, 100%, 50%)`
                 });
@@ -76,14 +90,19 @@
         function generateEnemies() {
             for (let i = 0; i < enemyCount; i++) {
                 const angle = Math.random() * Math.PI * 2;
+                const distance = 500 + Math.random() * 500;
+                const x = player.x + Math.cos(angle) * distance;
+                const y = player.y + Math.sin(angle) * distance;
+                
                 enemies.push({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height,
+                    x: x,
+                    y: y,
                     radius: 10,
-                    speed: 2,
+                    speed: 1 + Math.random() * 2,
                     angle: angle,
                     tail: [],
-                    length: 10 + Math.floor(Math.random() * 20)
+                    length: 10 + Math.floor(Math.random() * 20),
+                    color: `hsl(${Math.random() * 360}, 100%, 50%)`
                 });
             }
         }
@@ -100,8 +119,36 @@
         function checkCollision(x1, y1, r1, x2, y2, r2) {
             const dx = x1 - x2;
             const dy = y1 - y2;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            return distance < r1 + r2;
+            return dx * dx + dy * dy < (r1 + r2) * (r1 + r2);
+        }
+
+        // Преобразование мировых координат в экранные
+        function worldToScreen(x, y) {
+            return {
+                x: x - camera.x + camera.width / 2,
+                y: y - camera.y + camera.height / 2
+            };
+        }
+
+        // Отрисовка круга с учетом камеры
+        function drawCircle(x, y, radius, color) {
+            const screenPos = worldToScreen(x, y);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(screenPos.x, screenPos.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Отрисовка сегментов хвоста
+        function drawTailSegments(tail, radius, color) {
+            ctx.fillStyle = color;
+            for (let i = 0; i < tail.length; i++) {
+                const segment = tail[i];
+                const screenPos = worldToScreen(segment.x, segment.y);
+                ctx.beginPath();
+                ctx.arc(screenPos.x, screenPos.y, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
 
         // Основной цикл игры
@@ -110,11 +157,18 @@
             ctx.fillStyle = 'black';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Управление игроком (курсор/касание)
-            player.angle = Math.atan2(
-                player.y - (window.mouseY || centerY),
-                player.x - (window.mouseX || centerX)
-            );
+            // Обновление камеры (плавное следование за игроком)
+            camera.x += (player.x - camera.x) * 0.1;
+            camera.y += (player.y - camera.y) * 0.1;
+
+            // Управление игроком
+            if (window.mouseX !== undefined && window.mouseY !== undefined) {
+                const screenCenter = worldToScreen(player.x, player.y);
+                player.angle = Math.atan2(
+                    screenCenter.y - window.mouseY,
+                    screenCenter.x - window.mouseX
+                );
+            }
 
             // Движение игрока
             player.x -= Math.cos(player.angle) * player.speed;
@@ -123,80 +177,60 @@
             // Обновление хвоста игрока
             updateTail(player);
 
-            // Отрисовка игрока
-            ctx.fillStyle = 'white';
-            ctx.beginPath();
-            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-            ctx.fill();
+            // Отрисовка хвоста игрока (отдельными сегментами)
+            drawTailSegments(player.tail, player.radius * 0.9, player.color);
 
-            // Отрисовка хвоста игрока
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = player.radius * 1.5;
-            ctx.beginPath();
-            ctx.moveTo(player.tail[0]?.x || player.x, player.tail[0]?.y || player.y);
-            for (let i = 1; i < player.tail.length; i++) {
-                ctx.lineTo(player.tail[i].x, player.tail[i].y);
-            }
-            ctx.stroke();
+            // Отрисовка головы игрока
+            drawCircle(player.x, player.y, player.radius, player.color);
 
             // Проверка сбора еды
-            for (let i = 0; i < food.length; i++) {
+            for (let i = food.length - 1; i >= 0; i--) {
                 if (checkCollision(player.x, player.y, player.radius, food[i].x, food[i].y, food[i].radius)) {
                     player.length += 2;
                     player.score += 1;
                     scoreElement.textContent = `Score: ${player.score}`;
                     food.splice(i, 1);
+                    
+                    // Добавляем новую еду в случайном месте мира
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = 500 + Math.random() * 500;
                     food.push({
-                        x: Math.random() * canvas.width,
-                        y: Math.random() * canvas.height,
+                        x: player.x + Math.cos(angle) * distance,
+                        y: player.y + Math.sin(angle) * distance,
                         radius: 5,
                         color: `hsl(${Math.random() * 360}, 100%, 50%)`
                     });
-                    break;
                 }
             }
 
             // Отрисовка еды
             food.forEach(f => {
-                ctx.fillStyle = f.color;
-                ctx.beginPath();
-                ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
-                ctx.fill();
+                drawCircle(f.x, f.y, f.radius, f.color);
             });
 
-            // Движение врагов
+            // Движение и отрисовка врагов
             enemies.forEach(enemy => {
-                enemy.angle += (Math.random() - 0.5) * 0.2;
+                // ИИ врагов - простой патруль
+                if (Math.random() < 0.02) {
+                    enemy.angle = Math.random() * Math.PI * 2;
+                }
+
                 enemy.x += Math.cos(enemy.angle) * enemy.speed;
                 enemy.y += Math.sin(enemy.angle) * enemy.speed;
 
-                // Границы поля
-                if (enemy.x < 0) enemy.x = canvas.width;
-                if (enemy.x > canvas.width) enemy.x = 0;
-                if (enemy.y < 0) enemy.y = canvas.height;
-                if (enemy.y > canvas.height) enemy.y = 0;
-
+                // Обновление хвоста врага
                 updateTail(enemy);
 
-                // Отрисовка врага
-                ctx.fillStyle = 'red';
-                ctx.beginPath();
-                ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
-                ctx.fill();
-
                 // Отрисовка хвоста врага
-                ctx.strokeStyle = 'red';
-                ctx.lineWidth = enemy.radius * 1.5;
-                ctx.beginPath();
-                ctx.moveTo(enemy.tail[0]?.x || enemy.x, enemy.tail[0]?.y || enemy.y);
-                for (let i = 1; i < enemy.tail.length; i++) {
-                    ctx.lineTo(enemy.tail[i].x, enemy.tail[i].y);
-                }
-                ctx.stroke();
+                drawTailSegments(enemy.tail, enemy.radius * 0.9, enemy.color);
+
+                // Отрисовка головы врага
+                drawCircle(enemy.x, enemy.y, enemy.radius, enemy.color);
 
                 // Проверка столкновения с врагом
                 for (let i = 0; i < enemy.tail.length; i++) {
-                    if (checkCollision(player.x, player.y, player.radius, enemy.tail[i].x, enemy.tail[i].y, enemy.radius)) {
+                    if (checkCollision(player.x, player.y, player.radius, 
+                                       enemy.tail[i].x, enemy.tail[i].y, enemy.radius)) {
                         alert(`Game Over! Score: ${player.score}`);
                         resetGame();
                         return;
@@ -204,20 +238,26 @@
                 }
             });
 
+            // Респавн врагов, если их стало мало
+            if (enemies.length < enemyCount * 0.5) {
+                generateEnemies();
+            }
+
             requestAnimationFrame(gameLoop);
         }
 
         // Сброс игры
         function resetGame() {
             player = {
-                x: centerX,
-                y: centerY,
+                x: 0,
+                y: 0,
                 radius: 10,
                 speed: 3,
                 angle: 0,
                 tail: [],
                 length: 5,
-                score: 0
+                score: 0,
+                color: '#FFFFFF'
             };
             food = [];
             enemies = [];
@@ -227,19 +267,21 @@
         }
 
         // Отслеживание мыши/касания
-        window.mouseX = centerX;
-        window.mouseY = centerY;
+        window.mouseX = undefined;
+        window.mouseY = undefined;
 
         canvas.addEventListener('mousemove', (e) => {
-            window.mouseX = e.clientX;
-            window.mouseY = e.clientY;
+            const rect = canvas.getBoundingClientRect();
+            window.mouseX = e.clientX - rect.left;
+            window.mouseY = e.clientY - rect.top;
         });
 
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
             const touch = e.touches[0];
-            window.mouseX = touch.clientX;
-            window.mouseY = touch.clientY;
+            window.mouseX = touch.clientX - rect.left;
+            window.mouseY = touch.clientY - rect.top;
         }, { passive: false });
 
         // Запуск игры

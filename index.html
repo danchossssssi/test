@@ -11,6 +11,12 @@
             margin: 0;
             background: #f0f0f0;
             font-family: Arial, sans-serif;
+            touch-action: manipulation; /* Отключаем масштабирование на тач-устройствах */
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         canvas {
             border: 2px solid #333;
@@ -21,12 +27,44 @@
             font-size: 24px;
             margin-bottom: 10px;
         }
+        #controls {
+            display: grid;
+            grid-template-areas:
+                ". up ."
+                "left . right"
+                ". down .";
+            gap: 10px;
+            margin-top: 20px;
+        }
+        #up, #down, #left, #right {
+            width: 60px;
+            height: 60px;
+            background: #4CAF50;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+        }
+        #up { grid-area: up; }
+        #down { grid-area: down; }
+        #left { grid-area: left; }
+        #right { grid-area: right; }
     </style>
 </head>
 <body>
-    <div>
+    <div id="gameContainer">
         <div id="score">Счёт: 0</div>
-        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <canvas id="gameCanvas" width="300" height="300"></canvas>
+        <div id="controls">
+            <button id="up">↑</button>
+            <button id="left">←</button>
+            <button id="right">→</button>
+            <button id="down">↓</button>
+        </div>
     </div>
 
     <script>
@@ -34,10 +72,10 @@
         const ctx = canvas.getContext("2d");
         const scoreElement = document.getElementById("score");
 
-        const gridSize = 20; 
-        let snake = [{ x: 200, y: 200 }]; 
-        let food = generateFood(); 
-        let dx = gridSize; 
+        const gridSize = 20;
+        let snake = [{ x: 100, y: 100 }];
+        let food = generateFood();
+        let dx = gridSize;
         let dy = 0;
         let score = 0;
         let gameSpeed = 150;
@@ -72,35 +110,54 @@
             }
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             ctx.fillStyle = "red";
             ctx.fillRect(food.x, food.y, gridSize, gridSize);
-            
             ctx.fillStyle = "green";
             snake.forEach(segment => {
                 ctx.fillRect(segment.x, segment.y, gridSize, gridSize);
             });
         }
 
+        // Клавиатурное управление
         document.addEventListener("keydown", e => {
             switch (e.key) {
-                case "ArrowUp":
-                    if (dy === 0) { dx = 0; dy = -gridSize; }
-                    break;
-                case "ArrowDown":
-                    if (dy === 0) { dx = 0; dy = gridSize; }
-                    break;
-                case "ArrowLeft":
-                    if (dx === 0) { dx = -gridSize; dy = 0; }
-                    break;
-                case "ArrowRight":
-                    if (dx === 0) { dx = gridSize; dy = 0; }
-                    break;
+                case "ArrowUp": if (dy === 0) { dx = 0; dy = -gridSize; } break;
+                case "ArrowDown": if (dy === 0) { dx = 0; dy = gridSize; } break;
+                case "ArrowLeft": if (dx === 0) { dx = -gridSize; dy = 0; } break;
+                case "ArrowRight": if (dx === 0) { dx = gridSize; dy = 0; } break;
             }
         });
 
+        // Сенсорное управление
+        document.getElementById("up").addEventListener("touchstart", () => {
+            if (dy === 0) { dx = 0; dy = -gridSize; }
+        });
+        document.getElementById("down").addEventListener("touchstart", () => {
+            if (dy === 0) { dx = 0; dy = gridSize; }
+        });
+        document.getElementById("left").addEventListener("touchstart", () => {
+            if (dx === 0) { dx = -gridSize; dy = 0; }
+        });
+        document.getElementById("right").addEventListener("touchstart", () => {
+            if (dx === 0) { dx = gridSize; dy = 0; }
+        });
+
+        // Для кликов мышью (если вдруг на планшете с стилусом)
+        document.getElementById("up").addEventListener("click", () => {
+            if (dy === 0) { dx = 0; dy = -gridSize; }
+        });
+        document.getElementById("down").addEventListener("click", () => {
+            if (dy === 0) { dx = 0; dy = gridSize; }
+        });
+        document.getElementById("left").addEventListener("click", () => {
+            if (dx === 0) { dx = -gridSize; dy = 0; }
+        });
+        document.getElementById("right").addEventListener("click", () => {
+            if (dx === 0) { dx = gridSize; dy = 0; }
+        });
+
         function resetGame() {
-            snake = [{ x: 200, y: 200 }];
+            snake = [{ x: 100, y: 100 }];
             dx = gridSize;
             dy = 0;
             score = 0;

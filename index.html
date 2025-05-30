@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Slither.io Clone</title>
+    <title>Snake</title>
     <style>
         body {
             margin: 0;
@@ -73,7 +73,7 @@
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 100px;
+            width: 150px;
             height: 30px;
             background: rgba(255, 255, 255, 0.3);
             border-radius: 15px;
@@ -149,6 +149,12 @@
         .skin-option.selected {
             border-color: white;
         }
+        #controls-info {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #aaa;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -171,6 +177,9 @@
         </div>
         <button id="startBtn">START GAME</button>
         <button id="instructionsBtn">INSTRUCTIONS</button>
+        <div id="controls-info">
+            Move: Mouse/Touch | Boost: SPACE/Click
+        </div>
     </div>
     <div id="game-over">
         <h2>GAME OVER</h2>
@@ -212,7 +221,8 @@
             boost: 100,
             lastBoostTime: 0,
             isBoosting: false,
-            topPlayers: []
+            topPlayers: [],
+            controlSensitivity: 0.5 // Чувствительность управления
         };
 
         // Камера
@@ -220,32 +230,34 @@
             x: 0,
             y: 0,
             width: canvas.width,
-            height: canvas.height
+            height: canvas.height,
+            zoom: 1
         };
 
         // Игрок
         let player = {
             x: 0,
             y: 0,
-            radius: 10,
-            speed: 3,
-            boostSpeed: 6,
+            radius: 15, // Увеличенный размер
+            speed: 4,
+            boostSpeed: 7,
             angle: 0,
             tail: [],
-            length: 5,
+            length: 10,
             score: 0,
             color: '#FFFFFF',
             name: '',
-            segments: []
+            segments: [],
+            mass: 15
         };
 
         // Еда
         let food = [];
-        const foodCount = 200;
+        const foodCount = 300;
 
         // Враги
         let enemies = [];
-        const enemyCount = 15;
+        const enemyCount = 20;
 
         // Выбор скина
         let selectedColor = '#FFFFFF';
@@ -261,10 +273,11 @@
         function generateFood() {
             for (let i = 0; i < foodCount; i++) {
                 food.push({
-                    x: Math.random() * 4000 - 2000,
-                    y: Math.random() * 4000 - 2000,
-                    radius: 5,
-                    color: `hsl(${Math.random() * 360}, 100%, 50%)`
+                    x: Math.random() * 6000 - 3000,
+                    y: Math.random() * 6000 - 3000,
+                    radius: 8, // Увеличенный размер еды
+                    color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                    mass: 1
                 });
             }
         }
@@ -273,25 +286,28 @@
         function generateEnemies() {
             for (let i = 0; i < enemyCount; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                const distance = 500 + Math.random() * 1000;
+                const distance = 500 + Math.random() * 1500;
                 const x = player.x + Math.cos(angle) * distance;
                 const y = player.y + Math.sin(angle) * distance;
                 
                 const colors = ['#FF5252', '#FFEB3B', '#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#E91E63'];
                 const color = colors[Math.floor(Math.random() * colors.length)];
+                const size = 15 + Math.random() * 10;
                 
                 enemies.push({
                     x: x,
                     y: y,
-                    radius: 10,
-                    speed: 1 + Math.random() * 2,
+                    radius: size,
+                    speed: 1.5 + Math.random() * 2,
                     angle: angle,
                     tail: [],
-                    length: 10 + Math.floor(Math.random() * 30),
+                    length: 15 + Math.floor(Math.random() * 40),
                     color: color,
-                    name: `Player${Math.floor(Math.random() * 1000)}`,
-                    score: Math.floor(Math.random() * 100),
-                    segments: []
+                    name: `Bot${Math.floor(Math.random() * 1000)}`,
+                    score: Math.floor(Math.random() * 200),
+                    segments: [],
+                    mass: size,
+                    isBot: true
                 });
             }
         }
@@ -309,10 +325,12 @@
                 const prev = i === 0 ? {x: entity.x, y: entity.y} : entity.tail[i-1];
                 const curr = entity.tail[i];
                 
+                const radius = entity.radius * (0.4 + 0.6 * (1 - i / entity.length));
                 entity.segments.push({
                     x: curr.x,
                     y: curr.y,
-                    radius: entity.radius * (0.5 + 0.5 * (i / entity.length))
+                    radius: radius,
+                    mass: radius
                 });
             }
         }
@@ -327,17 +345,19 @@
         // Преобразование мировых координат в экранные
         function worldToScreen(x, y) {
             return {
-                x: x - camera.x + camera.width / 2,
-                y: y - camera.y + camera.height / 2
+                x: (x - camera.x) * camera.zoom + camera.width / 2,
+                y: (y - camera.y) * camera.zoom + camera.height / 2
             };
         }
 
         // Отрисовка круга с учетом камеры
         function drawCircle(x, y, radius, color) {
             const screenPos = worldToScreen(x, y);
+            const screenRadius = radius * camera.zoom;
+            
             ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.arc(screenPos.x, screenPos.y, radius, 0, Math.PI * 2);
+            ctx.arc(screenPos.x, screenPos.y, screenRadius, 0, Math.PI * 2);
             ctx.fill();
         }
 
@@ -346,18 +366,19 @@
             for (let i = 0; i < entity.segments.length; i++) {
                 const segment = entity.segments[i];
                 const screenPos = worldToScreen(segment.x, segment.y);
+                const screenRadius = segment.radius * camera.zoom;
                 
                 // Градиент для хвоста
                 const gradient = ctx.createRadialGradient(
                     screenPos.x, screenPos.y, 0,
-                    screenPos.x, screenPos.y, segment.radius
+                    screenPos.x, screenPos.y, screenRadius
                 );
                 gradient.addColorStop(0, entity.color);
                 gradient.addColorStop(1, adjustBrightness(entity.color, -0.3));
                 
                 ctx.fillStyle = gradient;
                 ctx.beginPath();
-                ctx.arc(screenPos.x, screenPos.y, segment.radius, 0, Math.PI * 2);
+                ctx.arc(screenPos.x, screenPos.y, screenRadius, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
@@ -381,19 +402,21 @@
             if (!entity.name) return;
             
             const screenPos = worldToScreen(entity.x, entity.y);
-            ctx.font = `${Math.max(12, entity.radius)}px Arial`;
+            const fontSize = Math.max(12, entity.radius * camera.zoom * 0.8);
+            
+            ctx.font = `${fontSize}px Arial`;
             ctx.textAlign = 'center';
             ctx.fillStyle = '#FFFFFF';
             ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 2;
-            ctx.strokeText(entity.name, screenPos.x, screenPos.y - entity.radius - 5);
-            ctx.fillText(entity.name, screenPos.x, screenPos.y - entity.radius - 5);
+            ctx.lineWidth = 2 * camera.zoom;
+            ctx.strokeText(entity.name, screenPos.x, screenPos.y - entity.radius * camera.zoom - 5);
+            ctx.fillText(entity.name, screenPos.x, screenPos.y - entity.radius * camera.zoom - 5);
             
             // Отрисовка счета для топ игроков
             if (entity.score > 50) {
-                ctx.font = `${Math.max(10, entity.radius - 2)}px Arial`;
-                ctx.strokeText(entity.score, screenPos.x, screenPos.y - entity.radius - 20);
-                ctx.fillText(entity.score, screenPos.x, screenPos.y - entity.radius - 20);
+                ctx.font = `${fontSize * 0.8}px Arial`;
+                ctx.strokeText(entity.score, screenPos.x, screenPos.y - entity.radius * camera.zoom - 15 - fontSize * 0.5);
+                ctx.fillText(entity.score, screenPos.x, screenPos.y - entity.radius * camera.zoom - 15 - fontSize * 0.5);
             }
         }
 
@@ -421,6 +444,68 @@
             });
         }
 
+        // Проверка убийства бота
+        function checkKillEnemies() {
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                
+                // Проверяем столкновение головы игрока с телом бота
+                for (let j = 1; j < enemy.tail.length; j++) {
+                    if (checkCollision(
+                        player.x, player.y, player.radius,
+                        enemy.tail[j].x, enemy.tail[j].y, enemy.radius * 0.8
+                    )) {
+                        // Игрок убил бота - добавляем очки и удаляем бота
+                        player.score += Math.floor(enemy.score * 0.5);
+                        player.length += Math.floor(enemy.length * 0.3);
+                        
+                        // Создаем еду из останков бота
+                        createFoodFromEnemy(enemy);
+                        
+                        enemies.splice(i, 1);
+                        scoreElement.textContent = `Score: ${player.score}`;
+                        break;
+                    }
+                }
+                
+                // Проверяем столкновение тела игрока с головой бота
+                for (let j = 1; j < player.tail.length; j++) {
+                    if (checkCollision(
+                        enemy.x, enemy.y, enemy.radius,
+                        player.tail[j].x, player.tail[j].y, player.radius * 0.8
+                    )) {
+                        // Бот убит телом игрока
+                        player.score += Math.floor(enemy.score * 0.5);
+                        player.length += Math.floor(enemy.length * 0.3);
+                        
+                        // Создаем еду из останков бота
+                        createFoodFromEnemy(enemy);
+                        
+                        enemies.splice(i, 1);
+                        scoreElement.textContent = `Score: ${player.score}`;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Создание еды из убитого врага
+        function createFoodFromEnemy(enemy) {
+            const pieces = 10 + Math.floor(enemy.mass / 5);
+            for (let i = 0; i < pieces; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * enemy.radius * 2;
+                
+                food.push({
+                    x: enemy.x + Math.cos(angle) * distance,
+                    y: enemy.y + Math.sin(angle) * distance,
+                    radius: 5 + Math.random() * 5,
+                    color: enemy.color,
+                    mass: 1
+                });
+            }
+        }
+
         // Основной цикл игры
         function gameLoop() {
             if (!gameState.started) return;
@@ -429,17 +514,24 @@
             ctx.fillStyle = 'black';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // Масштабирование камеры в зависимости от размера игрока
+            camera.zoom = Math.min(2, Math.max(0.5, 1 / (1 + player.mass * 0.005)));
+            
             // Обновление камеры (плавное следование за игроком)
             camera.x += (player.x - camera.x) * 0.1;
             camera.y += (player.y - camera.y) * 0.1;
 
-            // Управление игроком
+            // Управление игроком (упрощенное)
             if (window.mouseX !== undefined && window.mouseY !== undefined) {
                 const screenCenter = worldToScreen(player.x, player.y);
-                player.angle = Math.atan2(
+                const targetAngle = Math.atan2(
                     screenCenter.y - window.mouseY,
                     screenCenter.x - window.mouseX
                 );
+                
+                // Плавное изменение угла с учетом чувствительности
+                const angleDiff = ((targetAngle - player.angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+                player.angle += angleDiff * gameState.controlSensitivity * 0.1;
             }
 
             // Ускорение (boost)
@@ -449,7 +541,7 @@
                 gameState.boost = Math.max(0, gameState.boost - 0.5);
                 boostBar.style.width = `${gameState.boost}%`;
             } else {
-                player.speed = 3;
+                player.speed = 4;
                 if (currentTime - gameState.lastBoostTime > 100 && gameState.boost < 100) {
                     gameState.boost = Math.min(100, gameState.boost + 0.2);
                     boostBar.style.width = `${gameState.boost}%`;
@@ -476,17 +568,19 @@
                 if (checkCollision(player.x, player.y, player.radius, food[i].x, food[i].y, food[i].radius)) {
                     player.length += 2;
                     player.score += 1;
+                    player.mass += 0.1;
                     scoreElement.textContent = `Score: ${player.score}`;
                     food.splice(i, 1);
                     
                     // Добавляем новую еду в случайном месте мира
                     const angle = Math.random() * Math.PI * 2;
-                    const distance = 500 + Math.random() * 1000;
+                    const distance = 500 + Math.random() * 1500;
                     food.push({
                         x: player.x + Math.cos(angle) * distance,
                         y: player.y + Math.sin(angle) * distance,
-                        radius: 5,
-                        color: `hsl(${Math.random() * 360}, 100%, 50%)`
+                        radius: 8,
+                        color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                        mass: 1
                     });
                 }
             }
@@ -501,14 +595,19 @@
                 // ИИ врагов - простой патруль с небольшим преследованием игрока
                 if (Math.random() < 0.02) {
                     if (Math.random() < 0.3 && player.score > 10) {
-                        // Иногда преследуют игрока
+                        // Иногда преследуют игрока (если он достаточно большой)
                         enemy.angle = Math.atan2(
                             player.y - enemy.y,
                             player.x - enemy.x
                         );
+                        
+                        // Избегаем столкновений с более крупными змейками
+                        if (player.mass > enemy.mass * 1.5) {
+                            enemy.angle += Math.PI; // Разворачиваемся от игрока
+                        }
                     } else {
                         // Или просто случайное движение
-                        enemy.angle = Math.random() * Math.PI * 2;
+                        enemy.angle += (Math.random() - 0.5) * 1.5;
                     }
                 }
 
@@ -525,10 +624,18 @@
                 drawCircle(enemy.x, enemy.y, enemy.radius, enemy.color);
                 drawName(enemy);
 
-                // Проверка столкновения с врагом
-                for (let i = 0; i < enemy.tail.length; i++) {
-                    if (checkCollision(player.x, player.y, player.radius, 
-                                    enemy.tail[i].x, enemy.tail[i].y, enemy.radius)) {
+                // Проверка столкновения головы врага с головой игрока
+                if (checkCollision(player.x, player.y, player.radius, 
+                                 enemy.x, enemy.y, enemy.radius)) {
+                    if (player.mass > enemy.mass * 1.2) {
+                        // Игрок больше - убиваем врага
+                        player.score += Math.floor(enemy.score * 0.5);
+                        player.length += Math.floor(enemy.length * 0.3);
+                        createFoodFromEnemy(enemy);
+                        enemies.splice(enemies.indexOf(enemy), 1);
+                        scoreElement.textContent = `Score: ${player.score}`;
+                    } else if (enemy.mass > player.mass * 1.2) {
+                        // Враг больше - игрок погибает
                         gameOver();
                         return;
                     }
@@ -539,11 +646,15 @@
                     if (checkCollision(enemy.x, enemy.y, enemy.radius, food[i].x, food[i].y, food[i].radius)) {
                         enemy.length += 2;
                         enemy.score += 1;
+                        enemy.mass += 0.1;
                         food.splice(i, 1);
                         break;
                     }
                 }
             });
+
+            // Проверка убийства ботов
+            checkKillEnemies();
 
             // Респавн врагов, если их стало мало
             if (enemies.length < enemyCount * 0.5) {
@@ -570,16 +681,17 @@
             player = {
                 x: 0,
                 y: 0,
-                radius: 10,
-                speed: 3,
-                boostSpeed: 6,
+                radius: 15,
+                speed: 4,
+                boostSpeed: 7,
                 angle: 0,
                 tail: [],
                 segments: [],
-                length: 5,
+                length: 10,
                 score: 0,
                 color: gameState.playerColor,
-                name: gameState.nickname || 'Player'
+                name: gameState.nickname || 'Player',
+                mass: 15
             };
             food = [];
             enemies = [];
@@ -612,7 +724,7 @@
         });
 
         instructionsBtn.addEventListener('click', () => {
-            alert("HOW TO PLAY:\n\n1. Move your mouse to control your snake\n2. Press SPACE or LEFT MOUSE BUTTON to boost\n3. Eat colored dots to grow\n4. Avoid other snakes' tails\n5. Try to make others crash into your tail!\n\nTOP PLAYERS are displayed in the leaderboard on the right.");
+            alert("HOW TO PLAY:\n\n1. Move your mouse to control your snake\n2. Press SPACE or LEFT MOUSE BUTTON to boost\n3. Eat colored dots to grow\n4. Kill other snakes by making them crash into your body\n5. Avoid crashing into bigger snakes\n\nTOP PLAYERS are displayed in the leaderboard on the right.");
         });
 
         // Управление ускорением

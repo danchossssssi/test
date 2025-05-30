@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Snake</title>
+    <title>Slither.io Clone</title>
     <style>
         body {
             margin: 0;
@@ -85,16 +85,97 @@
             background: linear-gradient(to right, #4CAF50, #8BC34A);
             transition: width 0.3s;
         }
+        #leaderboard {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 10px;
+            color: white;
+            width: 200px;
+            z-index: 100;
+        }
+        #leaderboard h3 {
+            margin: 0 0 10px 0;
+            text-align: center;
+            color: #4CAF50;
+        }
+        .leaderboard-entry {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        .leaderboard-you {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        #game-over {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+            color: white;
+        }
+        #game-over h2 {
+            font-size: 36px;
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+        #final-score {
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+        #skin-selector {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        .skin-option {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .skin-option.selected {
+            border-color: white;
+        }
     </style>
 </head>
 <body>
     <div id="score">Score: 0</div>
+    <div id="leaderboard">
+        <h3>TOP PLAYERS</h3>
+        <div id="leaderboard-entries"></div>
+    </div>
     <div id="boost"><div id="boost-bar"></div></div>
     <div id="menu">
-        <h1>SNAKE</h1>
+        <h1>SLITHER.IO CLONE</h1>
         <input type="text" id="nickname" placeholder="Enter your nickname" maxlength="15">
+        <div id="skin-selector">
+            <div class="skin-option selected" style="background: #FFFFFF;" data-color="#FFFFFF"></div>
+            <div class="skin-option" style="background: #FF5252;" data-color="#FF5252"></div>
+            <div class="skin-option" style="background: #FFEB3B;" data-color="#FFEB3B"></div>
+            <div class="skin-option" style="background: #4CAF50;" data-color="#4CAF50"></div>
+            <div class="skin-option" style="background: #2196F3;" data-color="#2196F3"></div>
+            <div class="skin-option" style="background: #9C27B0;" data-color="#9C27B0"></div>
+        </div>
         <button id="startBtn">START GAME</button>
         <button id="instructionsBtn">INSTRUCTIONS</button>
+    </div>
+    <div id="game-over">
+        <h2>GAME OVER</h2>
+        <div id="final-score">Score: 0</div>
+        <button id="playAgainBtn">PLAY AGAIN</button>
     </div>
     <canvas id="gameCanvas"></canvas>
 
@@ -108,6 +189,12 @@
         const nicknameInput = document.getElementById('nickname');
         const boostElement = document.getElementById('boost');
         const boostBar = document.getElementById('boost-bar');
+        const leaderboardElement = document.getElementById('leaderboard');
+        const leaderboardEntries = document.getElementById('leaderboard-entries');
+        const gameOverElement = document.getElementById('game-over');
+        const finalScoreElement = document.getElementById('final-score');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+        const skinOptions = document.querySelectorAll('.skin-option');
 
         // Настройки игры
         function resizeCanvas() {
@@ -121,9 +208,11 @@
         let gameState = {
             started: false,
             nickname: '',
+            playerColor: '#FFFFFF',
             boost: 100,
             lastBoostTime: 0,
-            isBoosting: false
+            isBoosting: false,
+            topPlayers: []
         };
 
         // Камера
@@ -146,6 +235,7 @@
             length: 5,
             score: 0,
             color: '#FFFFFF',
+            name: '',
             segments: []
         };
 
@@ -156,6 +246,16 @@
         // Враги
         let enemies = [];
         const enemyCount = 15;
+
+        // Выбор скина
+        let selectedColor = '#FFFFFF';
+        skinOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                skinOptions.forEach(o => o.classList.remove('selected'));
+                option.classList.add('selected');
+                selectedColor = option.getAttribute('data-color');
+            });
+        });
 
         // Генерация еды
         function generateFood() {
@@ -177,6 +277,9 @@
                 const x = player.x + Math.cos(angle) * distance;
                 const y = player.y + Math.sin(angle) * distance;
                 
+                const colors = ['#FF5252', '#FFEB3B', '#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#E91E63'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
                 enemies.push({
                     x: x,
                     y: y,
@@ -185,8 +288,10 @@
                     angle: angle,
                     tail: [],
                     length: 10 + Math.floor(Math.random() * 30),
-                    color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-                    name: `Enemy${Math.floor(Math.random() * 1000)}`
+                    color: color,
+                    name: `Player${Math.floor(Math.random() * 1000)}`,
+                    score: Math.floor(Math.random() * 100),
+                    segments: []
                 });
             }
         }
@@ -283,6 +388,37 @@
             ctx.lineWidth = 2;
             ctx.strokeText(entity.name, screenPos.x, screenPos.y - entity.radius - 5);
             ctx.fillText(entity.name, screenPos.x, screenPos.y - entity.radius - 5);
+            
+            // Отрисовка счета для топ игроков
+            if (entity.score > 50) {
+                ctx.font = `${Math.max(10, entity.radius - 2)}px Arial`;
+                ctx.strokeText(entity.score, screenPos.x, screenPos.y - entity.radius - 20);
+                ctx.fillText(entity.score, screenPos.x, screenPos.y - entity.radius - 20);
+            }
+        }
+
+        // Обновление списка лидеров
+        function updateLeaderboard() {
+            // Создаем массив всех игроков (игрок + враги)
+            const allPlayers = [player, ...enemies];
+            
+            // Сортируем по убыванию счета
+            const sortedPlayers = [...allPlayers].sort((a, b) => b.score - a.score);
+            
+            // Берем топ-5
+            gameState.topPlayers = sortedPlayers.slice(0, 5);
+            
+            // Обновляем отображение
+            leaderboardEntries.innerHTML = '';
+            gameState.topPlayers.forEach((p, index) => {
+                const entry = document.createElement('div');
+                entry.className = `leaderboard-entry ${p === player ? 'leaderboard-you' : ''}`;
+                entry.innerHTML = `
+                    <span>${index + 1}. ${p.name}</span>
+                    <span>${p.score}</span>
+                `;
+                leaderboardEntries.appendChild(entry);
+            });
         }
 
         // Основной цикл игры
@@ -397,6 +533,16 @@
                         return;
                     }
                 }
+
+                // Враги тоже собирают еду
+                for (let i = food.length - 1; i >= 0; i--) {
+                    if (checkCollision(enemy.x, enemy.y, enemy.radius, food[i].x, food[i].y, food[i].radius)) {
+                        enemy.length += 2;
+                        enemy.score += 1;
+                        food.splice(i, 1);
+                        break;
+                    }
+                }
             });
 
             // Респавн врагов, если их стало мало
@@ -404,14 +550,19 @@
                 generateEnemies();
             }
 
+            // Обновление списка лидеров
+            updateLeaderboard();
+
             requestAnimationFrame(gameLoop);
         }
 
         // Конец игры
         function gameOver() {
             gameState.started = false;
-            menuElement.style.display = 'flex';
-            alert(`Game Over! Your score: ${player.score}`);
+            finalScoreElement.textContent = `Score: ${player.score}`;
+            gameOverElement.style.display = 'flex';
+            leaderboardElement.style.display = 'none';
+            boostElement.style.display = 'none';
         }
 
         // Сброс игры
@@ -427,7 +578,7 @@
                 segments: [],
                 length: 5,
                 score: 0,
-                color: '#FFFFFF',
+                color: gameState.playerColor,
                 name: gameState.nickname || 'Player'
             };
             food = [];
@@ -442,15 +593,26 @@
         // Обработчики событий
         startBtn.addEventListener('click', () => {
             gameState.nickname = nicknameInput.value.trim() || 'Player';
+            gameState.playerColor = selectedColor;
             gameState.started = true;
             menuElement.style.display = 'none';
             boostElement.style.display = 'block';
+            leaderboardElement.style.display = 'block';
+            resetGame();
+            gameLoop();
+        });
+
+        playAgainBtn.addEventListener('click', () => {
+            gameOverElement.style.display = 'none';
+            gameState.started = true;
+            boostElement.style.display = 'block';
+            leaderboardElement.style.display = 'block';
             resetGame();
             gameLoop();
         });
 
         instructionsBtn.addEventListener('click', () => {
-            alert("HOW TO PLAY:\n\n1. Move your mouse to control your snake\n2. Press SPACE or LEFT MOUSE BUTTON to boost\n3. Eat colored dots to grow\n4. Avoid other snakes' tails\n5. Try to make others crash into your tail!");
+            alert("HOW TO PLAY:\n\n1. Move your mouse to control your snake\n2. Press SPACE or LEFT MOUSE BUTTON to boost\n3. Eat colored dots to grow\n4. Avoid other snakes' tails\n5. Try to make others crash into your tail!\n\nTOP PLAYERS are displayed in the leaderboard on the right.");
         });
 
         // Управление ускорением
@@ -507,6 +669,7 @@
 
         // Инициализация
         boostElement.style.display = 'none';
+        leaderboardElement.style.display = 'none';
         generateFood();
         generateEnemies();
     </script>

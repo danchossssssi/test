@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Slither.io Clone</title>
+    <title>Snake</title>
     <style>
         body {
             margin: 0;
@@ -26,16 +26,88 @@
             z-index: 100;
             text-shadow: 1px 1px 2px black;
         }
+        #menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            color: white;
+        }
+        #menu h1 {
+            font-size: 48px;
+            margin-bottom: 30px;
+            color: #4CAF50;
+            text-shadow: 0 0 10px #4CAF50;
+        }
+        #menu button {
+            padding: 15px 30px;
+            font-size: 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        #menu button:hover {
+            background: #45a049;
+            transform: scale(1.05);
+        }
+        #nickname {
+            padding: 10px;
+            font-size: 16px;
+            margin-bottom: 20px;
+            width: 200px;
+            text-align: center;
+        }
+        #boost {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        #boost-bar {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(to right, #4CAF50, #8BC34A);
+            transition: width 0.3s;
+        }
     </style>
 </head>
 <body>
     <div id="score">Score: 0</div>
+    <div id="boost"><div id="boost-bar"></div></div>
+    <div id="menu">
+        <h1>SLITHER.IO CLONE</h1>
+        <input type="text" id="nickname" placeholder="Enter your nickname" maxlength="15">
+        <button id="startBtn">START GAME</button>
+        <button id="instructionsBtn">INSTRUCTIONS</button>
+    </div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('score');
+        const menuElement = document.getElementById('menu');
+        const startBtn = document.getElementById('startBtn');
+        const instructionsBtn = document.getElementById('instructionsBtn');
+        const nicknameInput = document.getElementById('nickname');
+        const boostElement = document.getElementById('boost');
+        const boostBar = document.getElementById('boost-bar');
 
         // Настройки игры
         function resizeCanvas() {
@@ -44,6 +116,15 @@
         }
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
+
+        // Состояние игры
+        let gameState = {
+            started: false,
+            nickname: '',
+            boost: 100,
+            lastBoostTime: 0,
+            isBoosting: false
+        };
 
         // Камера
         let camera = {
@@ -59,27 +140,29 @@
             y: 0,
             radius: 10,
             speed: 3,
+            boostSpeed: 6,
             angle: 0,
             tail: [],
             length: 5,
             score: 0,
-            color: '#FFFFFF'
+            color: '#FFFFFF',
+            segments: []
         };
 
         // Еда
         let food = [];
-        const foodCount = 100;
+        const foodCount = 200;
 
         // Враги
         let enemies = [];
-        const enemyCount = 10;
+        const enemyCount = 15;
 
         // Генерация еды
         function generateFood() {
             for (let i = 0; i < foodCount; i++) {
                 food.push({
-                    x: Math.random() * 2000 - 1000,
-                    y: Math.random() * 2000 - 1000,
+                    x: Math.random() * 4000 - 2000,
+                    y: Math.random() * 4000 - 2000,
                     radius: 5,
                     color: `hsl(${Math.random() * 360}, 100%, 50%)`
                 });
@@ -90,7 +173,7 @@
         function generateEnemies() {
             for (let i = 0; i < enemyCount; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                const distance = 500 + Math.random() * 500;
+                const distance = 500 + Math.random() * 1000;
                 const x = player.x + Math.cos(angle) * distance;
                 const y = player.y + Math.sin(angle) * distance;
                 
@@ -101,8 +184,9 @@
                     speed: 1 + Math.random() * 2,
                     angle: angle,
                     tail: [],
-                    length: 10 + Math.floor(Math.random() * 20),
-                    color: `hsl(${Math.random() * 360}, 100%, 50%)`
+                    length: 10 + Math.floor(Math.random() * 30),
+                    color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+                    name: `Enemy${Math.floor(Math.random() * 1000)}`
                 });
             }
         }
@@ -112,6 +196,19 @@
             entity.tail.unshift({ x: entity.x, y: entity.y });
             if (entity.tail.length > entity.length) {
                 entity.tail.pop();
+            }
+            
+            // Создание сегментов для плавного хвоста
+            entity.segments = [];
+            for (let i = 0; i < entity.tail.length; i++) {
+                const prev = i === 0 ? {x: entity.x, y: entity.y} : entity.tail[i-1];
+                const curr = entity.tail[i];
+                
+                entity.segments.push({
+                    x: curr.x,
+                    y: curr.y,
+                    radius: entity.radius * (0.5 + 0.5 * (i / entity.length))
+                });
             }
         }
 
@@ -140,19 +237,58 @@
         }
 
         // Отрисовка сегментов хвоста
-        function drawTailSegments(tail, radius, color) {
-            ctx.fillStyle = color;
-            for (let i = 0; i < tail.length; i++) {
-                const segment = tail[i];
+        function drawTailSegments(entity) {
+            for (let i = 0; i < entity.segments.length; i++) {
+                const segment = entity.segments[i];
                 const screenPos = worldToScreen(segment.x, segment.y);
+                
+                // Градиент для хвоста
+                const gradient = ctx.createRadialGradient(
+                    screenPos.x, screenPos.y, 0,
+                    screenPos.x, screenPos.y, segment.radius
+                );
+                gradient.addColorStop(0, entity.color);
+                gradient.addColorStop(1, adjustBrightness(entity.color, -0.3));
+                
+                ctx.fillStyle = gradient;
                 ctx.beginPath();
-                ctx.arc(screenPos.x, screenPos.y, radius, 0, Math.PI * 2);
+                ctx.arc(screenPos.x, screenPos.y, segment.radius, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
 
+        // Изменение яркости цвета
+        function adjustBrightness(color, amount) {
+            const hex = color.replace('#', '');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+
+            const newR = Math.max(0, Math.min(255, r + Math.round(255 * amount)));
+            const newG = Math.max(0, Math.min(255, g + Math.round(255 * amount)));
+            const newB = Math.max(0, Math.min(255, b + Math.round(255 * amount)));
+
+            return `#${((newR << 16) | (newG << 8) | newB).toString(16).padStart(6, '0')}`;
+        }
+
+        // Отрисовка имени игрока
+        function drawName(entity) {
+            if (!entity.name) return;
+            
+            const screenPos = worldToScreen(entity.x, entity.y);
+            ctx.font = `${Math.max(12, entity.radius)}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.strokeText(entity.name, screenPos.x, screenPos.y - entity.radius - 5);
+            ctx.fillText(entity.name, screenPos.x, screenPos.y - entity.radius - 5);
+        }
+
         // Основной цикл игры
         function gameLoop() {
+            if (!gameState.started) return;
+
             // Очистка экрана
             ctx.fillStyle = 'black';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -170,6 +306,21 @@
                 );
             }
 
+            // Ускорение (boost)
+            const currentTime = Date.now();
+            if (gameState.isBoosting && gameState.boost > 0) {
+                player.speed = player.boostSpeed;
+                gameState.boost = Math.max(0, gameState.boost - 0.5);
+                boostBar.style.width = `${gameState.boost}%`;
+            } else {
+                player.speed = 3;
+                if (currentTime - gameState.lastBoostTime > 100 && gameState.boost < 100) {
+                    gameState.boost = Math.min(100, gameState.boost + 0.2);
+                    boostBar.style.width = `${gameState.boost}%`;
+                    gameState.lastBoostTime = currentTime;
+                }
+            }
+
             // Движение игрока
             player.x -= Math.cos(player.angle) * player.speed;
             player.y -= Math.sin(player.angle) * player.speed;
@@ -177,11 +328,12 @@
             // Обновление хвоста игрока
             updateTail(player);
 
-            // Отрисовка хвоста игрока (отдельными сегментами)
-            drawTailSegments(player.tail, player.radius * 0.9, player.color);
+            // Отрисовка хвоста игрока
+            drawTailSegments(player);
 
             // Отрисовка головы игрока
             drawCircle(player.x, player.y, player.radius, player.color);
+            drawName(player);
 
             // Проверка сбора еды
             for (let i = food.length - 1; i >= 0; i--) {
@@ -193,7 +345,7 @@
                     
                     // Добавляем новую еду в случайном месте мира
                     const angle = Math.random() * Math.PI * 2;
-                    const distance = 500 + Math.random() * 500;
+                    const distance = 500 + Math.random() * 1000;
                     food.push({
                         x: player.x + Math.cos(angle) * distance,
                         y: player.y + Math.sin(angle) * distance,
@@ -210,9 +362,18 @@
 
             // Движение и отрисовка врагов
             enemies.forEach(enemy => {
-                // ИИ врагов - простой патруль
+                // ИИ врагов - простой патруль с небольшим преследованием игрока
                 if (Math.random() < 0.02) {
-                    enemy.angle = Math.random() * Math.PI * 2;
+                    if (Math.random() < 0.3 && player.score > 10) {
+                        // Иногда преследуют игрока
+                        enemy.angle = Math.atan2(
+                            player.y - enemy.y,
+                            player.x - enemy.x
+                        );
+                    } else {
+                        // Или просто случайное движение
+                        enemy.angle = Math.random() * Math.PI * 2;
+                    }
                 }
 
                 enemy.x += Math.cos(enemy.angle) * enemy.speed;
@@ -222,17 +383,17 @@
                 updateTail(enemy);
 
                 // Отрисовка хвоста врага
-                drawTailSegments(enemy.tail, enemy.radius * 0.9, enemy.color);
+                drawTailSegments(enemy);
 
                 // Отрисовка головы врага
                 drawCircle(enemy.x, enemy.y, enemy.radius, enemy.color);
+                drawName(enemy);
 
                 // Проверка столкновения с врагом
                 for (let i = 0; i < enemy.tail.length; i++) {
                     if (checkCollision(player.x, player.y, player.radius, 
-                                       enemy.tail[i].x, enemy.tail[i].y, enemy.radius)) {
-                        alert(`Game Over! Score: ${player.score}`);
-                        resetGame();
+                                    enemy.tail[i].x, enemy.tail[i].y, enemy.radius)) {
+                        gameOver();
                         return;
                     }
                 }
@@ -246,6 +407,13 @@
             requestAnimationFrame(gameLoop);
         }
 
+        // Конец игры
+        function gameOver() {
+            gameState.started = false;
+            menuElement.style.display = 'flex';
+            alert(`Game Over! Your score: ${player.score}`);
+        }
+
         // Сброс игры
         function resetGame() {
             player = {
@@ -253,18 +421,71 @@
                 y: 0,
                 radius: 10,
                 speed: 3,
+                boostSpeed: 6,
                 angle: 0,
                 tail: [],
+                segments: [],
                 length: 5,
                 score: 0,
-                color: '#FFFFFF'
+                color: '#FFFFFF',
+                name: gameState.nickname || 'Player'
             };
             food = [];
             enemies = [];
+            gameState.boost = 100;
+            boostBar.style.width = '100%';
             generateFood();
             generateEnemies();
             scoreElement.textContent = 'Score: 0';
         }
+
+        // Обработчики событий
+        startBtn.addEventListener('click', () => {
+            gameState.nickname = nicknameInput.value.trim() || 'Player';
+            gameState.started = true;
+            menuElement.style.display = 'none';
+            boostElement.style.display = 'block';
+            resetGame();
+            gameLoop();
+        });
+
+        instructionsBtn.addEventListener('click', () => {
+            alert("HOW TO PLAY:\n\n1. Move your mouse to control your snake\n2. Press SPACE or LEFT MOUSE BUTTON to boost\n3. Eat colored dots to grow\n4. Avoid other snakes' tails\n5. Try to make others crash into your tail!");
+        });
+
+        // Управление ускорением
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && gameState.started) {
+                e.preventDefault();
+                gameState.isBoosting = true;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                gameState.isBoosting = false;
+            }
+        });
+
+        canvas.addEventListener('mousedown', () => {
+            if (gameState.started) {
+                gameState.isBoosting = true;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            gameState.isBoosting = false;
+        });
+
+        canvas.addEventListener('touchstart', () => {
+            if (gameState.started) {
+                gameState.isBoosting = true;
+            }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            gameState.isBoosting = false;
+        });
 
         // Отслеживание мыши/касания
         window.mouseX = undefined;
@@ -284,10 +505,10 @@
             window.mouseY = touch.clientY - rect.top;
         }, { passive: false });
 
-        // Запуск игры
+        // Инициализация
+        boostElement.style.display = 'none';
         generateFood();
         generateEnemies();
-        gameLoop();
     </script>
 </body>
 </html>

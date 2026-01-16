@@ -1,789 +1,593 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Snake</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2D Платформер с телефонным управлением</title>
     <style>
-        body {
+        * {
             margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
             overflow: hidden;
-            background: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             height: 100vh;
-            font-family: Arial;
-        }
-        canvas {
-            display: block;
-            border: 2px solid #333;
-        }
-        #score {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            color: white;
-            font-size: 20px;
-            z-index: 100;
-            text-shadow: 1px 1px 2px black;
-        }
-        #menu {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
-            z-index: 200;
-            color: white;
-        }
-        #menu h1 {
-            font-size: 48px;
-            margin-bottom: 30px;
-            color: #4CAF50;
-            text-shadow: 0 0 10px #4CAF50;
-        }
-        #menu button {
-            padding: 15px 30px;
-            font-size: 20px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin: 10px;
-            transition: all 0.3s;
-        }
-        #menu button:hover {
-            background: #45a049;
-            transform: scale(1.05);
-        }
-        #nickname {
+            justify-content: center;
             padding: 10px;
-            font-size: 16px;
-            margin-bottom: 20px;
-            width: 200px;
-            text-align: center;
         }
-        #boost {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 150px;
-            height: 30px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 15px;
-            overflow: hidden;
-        }
-        #boost-bar {
-            height: 100%;
+        
+        .container {
             width: 100%;
-            background: linear-gradient(to right, #4CAF50, #8BC34A);
-            transition: width 0.3s;
-        }
-        #leaderboard {
-            position: fixed;
-            top: 60px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 10px;
-            padding: 10px;
-            color: white;
-            width: 200px;
-            z-index: 100;
-        }
-        #leaderboard h3 {
-            margin: 0 0 10px 0;
+            max-width: 800px;
             text-align: center;
-            color: #4CAF50;
         }
-        .leaderboard-entry {
+        
+        h1 {
+            margin-bottom: 15px;
+            color: #4cc9f0;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+            font-size: 2.2rem;
+        }
+        
+        .game-info {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 5px;
-            font-size: 14px;
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
         }
-        .leaderboard-you {
-            color: #4CAF50;
-            font-weight: bold;
-        }
-        #game-over {
-            position: fixed;
-            top: 0;
-            left: 0;
+        
+        .game-container {
+            position: relative;
             width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 300;
-            color: white;
-        }
-        #game-over h2 {
-            font-size: 36px;
-            color: #4CAF50;
+            height: 500px;
+            background-color: #0f3460;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
             margin-bottom: 20px;
         }
-        #final-score {
-            font-size: 24px;
-            margin-bottom: 30px;
+        
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
         }
-        #skin-selector {
-            margin: 20px 0;
+        
+        .controls {
             display: flex;
-            gap: 10px;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            padding: 15px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            margin-top: 10px;
         }
-        .skin-option {
-            width: 30px;
-            height: 30px;
+        
+        .movement-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 15px;
+            width: 100%;
+        }
+        
+        .control-btn {
+            background-color: #4361ee;
+            color: white;
+            border: none;
             border-radius: 50%;
-            cursor: pointer;
-            border: 2px solid transparent;
+            width: 70px;
+            height: 70px;
+            font-size: 28px;
+            margin: 0 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.1s;
+            touch-action: manipulation;
         }
-        .skin-option.selected {
-            border-color: white;
+        
+        .control-btn:active {
+            background-color: #3a56d4;
+            transform: scale(0.95);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
         }
-        #controls-info {
-            margin-top: 20px;
-            font-size: 14px;
-            color: #aaa;
-            text-align: center;
+        
+        .jump-btn {
+            background-color: #f72585;
+            width: 100px;
+            height: 100px;
+            font-size: 32px;
+        }
+        
+        .instructions {
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            .game-container {
+                height: 400px;
+            }
+            
+            .control-btn {
+                width: 65px;
+                height: 65px;
+                font-size: 26px;
+                margin: 0 10px;
+            }
+            
+            .jump-btn {
+                width: 90px;
+                height: 90px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .game-container {
+                height: 350px;
+            }
+            
+            .game-info {
+                font-size: 0.9rem;
+            }
+            
+            .control-btn {
+                width: 60px;
+                height: 60px;
+                font-size: 24px;
+                margin: 0 8px;
+            }
+            
+            .jump-btn {
+                width: 80px;
+                height: 80px;
+                font-size: 28px;
+            }
+            
+            .instructions {
+                font-size: 0.9rem;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="score">Score: 0</div>
-    <div id="leaderboard">
-        <h3>TOP PLAYERS</h3>
-        <div id="leaderboard-entries"></div>
-    </div>
-    <div id="boost"><div id="boost-bar"></div></div>
-    <div id="menu">
-        <h1>SLITHER.IO CLONE</h1>
-        <input type="text" id="nickname" placeholder="Enter your nickname" maxlength="15">
-        <div id="skin-selector">
-            <div class="skin-option selected" style="background: #FFFFFF;" data-color="#FFFFFF"></div>
-            <div class="skin-option" style="background: #FF5252;" data-color="#FF5252"></div>
-            <div class="skin-option" style="background: #FFEB3B;" data-color="#FFEB3B"></div>
-            <div class="skin-option" style="background: #4CAF50;" data-color="#4CAF50"></div>
-            <div class="skin-option" style="background: #2196F3;" data-color="#2196F3"></div>
-            <div class="skin-option" style="background: #9C27B0;" data-color="#9C27B0"></div>
+    <div class="container">
+        <h1>2D Платформер</h1>
+        
+        <div class="game-info">
+            <div>Очки: <span id="score">0</span></div>
+            <div>Жизни: <span id="lives">3</span></div>
+            <div>Уровень: <span id="level">1</span></div>
         </div>
-        <button id="startBtn">START GAME</button>
-        <button id="instructionsBtn">INSTRUCTIONS</button>
-        <div id="controls-info">
-            Move: Mouse/Touch | Boost: SPACE/Click
+        
+        <div class="game-container">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        
+        <div class="controls">
+            <div class="movement-controls">
+                <button class="control-btn left-btn">←</button>
+                <button class="control-btn right-btn">→</button>
+            </div>
+            <button class="control-btn jump-btn">↑</button>
+        </div>
+        
+        <div class="instructions">
+            <p>Используйте кнопки для управления персонажем. Соберите монеты, избегайте препятствий!</p>
         </div>
     </div>
-    <div id="game-over">
-        <h2>GAME OVER</h2>
-        <div id="final-score">Score: 0</div>
-        <button id="playAgainBtn">PLAY AGAIN</button>
-    </div>
-    <canvas id="gameCanvas"></canvas>
 
     <script>
+        // Получаем элементы DOM
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('score');
-        const menuElement = document.getElementById('menu');
-        const startBtn = document.getElementById('startBtn');
-        const instructionsBtn = document.getElementById('instructionsBtn');
-        const nicknameInput = document.getElementById('nickname');
-        const boostElement = document.getElementById('boost');
-        const boostBar = document.getElementById('boost-bar');
-        const leaderboardElement = document.getElementById('leaderboard');
-        const leaderboardEntries = document.getElementById('leaderboard-entries');
-        const gameOverElement = document.getElementById('game-over');
-        const finalScoreElement = document.getElementById('final-score');
-        const playAgainBtn = document.getElementById('playAgainBtn');
-        const skinOptions = document.querySelectorAll('.skin-option');
-
-        // Настройки игры
+        const livesElement = document.getElementById('lives');
+        const levelElement = document.getElementById('level');
+        
+        // Устанавливаем размеры canvas
         function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
         }
+        
+        // Инициализация размеров canvas
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
-
-        // Состояние игры
-        let gameState = {
-            started: false,
-            nickname: '',
-            playerColor: '#FFFFFF',
-            boost: 100,
-            lastBoostTime: 0,
-            isBoosting: false,
-            topPlayers: [],
-            controlSensitivity: 0.5 // Чувствительность управления
-        };
-
-        // Камера
-        let camera = {
-            x: 0,
-            y: 0,
-            width: canvas.width,
-            height: canvas.height,
-            zoom: 1
-        };
-
+        
+        // Игровые переменные
+        let score = 0;
+        let lives = 3;
+        let level = 1;
+        let gameRunning = true;
+        
         // Игрок
-        let player = {
-            x: 0,
-            y: 0,
-            radius: 15, // Увеличенный размер
-            speed: 4,
-            boostSpeed: 7,
-            angle: 0,
-            tail: [],
-            length: 10,
-            score: 0,
-            color: '#FFFFFF',
-            name: '',
-            segments: [],
-            mass: 15
+        const player = {
+            x: 100,
+            y: 300,
+            width: 30,
+            height: 50,
+            color: '#4cc9f0',
+            speed: 5,
+            velX: 0,
+            velY: 0,
+            jumpPower: 15,
+            grounded: false,
+            jumping: false
         };
-
-        // Еда
-        let food = [];
-        const foodCount = 300;
-
-        // Враги
-        let enemies = [];
-        const enemyCount = 20;
-
-        // Выбор скина
-        let selectedColor = '#FFFFFF';
-        skinOptions.forEach(option => {
-            option.addEventListener('click', () => {
-                skinOptions.forEach(o => o.classList.remove('selected'));
-                option.classList.add('selected');
-                selectedColor = option.getAttribute('data-color');
-            });
+        
+        // Платформы
+        const platforms = [
+            {x: 0, y: 450, width: 200, height: 20, color: '#4361ee'},
+            {x: 250, y: 400, width: 150, height: 20, color: '#4361ee'},
+            {x: 450, y: 350, width: 150, height: 20, color: '#4361ee'},
+            {x: 650, y: 300, width: 150, height: 20, color: '#4361ee'},
+            {x: 300, y: 250, width: 150, height: 20, color: '#4361ee'},
+            {x: 500, y: 200, width: 150, height: 20, color: '#4361ee'},
+            {x: 100, y: 150, width: 150, height: 20, color: '#4361ee'},
+            {x: 0, y: 550, width: 800, height: 50, color: '#3a0ca3'} // пол
+        ];
+        
+        // Монеты
+        let coins = [
+            {x: 120, y: 420, radius: 10, color: '#ffd166', collected: false},
+            {x: 320, y: 370, radius: 10, color: '#ffd166', collected: false},
+            {x: 520, y: 320, radius: 10, color: '#ffd166', collected: false},
+            {x: 720, y: 270, radius: 10, color: '#ffd166', collected: false},
+            {x: 370, y: 220, radius: 10, color: '#ffd166', collected: false},
+            {x: 570, y: 170, radius: 10, color: '#ffd166', collected: false},
+            {x: 170, y: 120, radius: 10, color: '#ffd166', collected: false}
+        ];
+        
+        // Препятствия
+        const obstacles = [
+            {x: 400, y: 430, width: 20, height: 20, color: '#f72585'},
+            {x: 600, y: 280, width: 20, height: 20, color: '#f72585'},
+            {x: 200, y: 180, width: 20, height: 20, color: '#f72585'}
+        ];
+        
+        // Управление с кнопок
+        const leftBtn = document.querySelector('.left-btn');
+        const rightBtn = document.querySelector('.right-btn');
+        const jumpBtn = document.querySelector('.jump-btn');
+        
+        let leftPressed = false;
+        let rightPressed = false;
+        
+        // Обработчики событий для кнопок
+        leftBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            leftPressed = true;
         });
-
-        // Генерация еды
-        function generateFood() {
-            for (let i = 0; i < foodCount; i++) {
-                food.push({
-                    x: Math.random() * 6000 - 3000,
-                    y: Math.random() * 6000 - 3000,
-                    radius: 8, // Увеличенный размер еды
-                    color: `hsl(${Math.random() * 360}, 100%, 50%)`,
-                    mass: 1
-                });
+        
+        leftBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            leftPressed = false;
+        });
+        
+        leftBtn.addEventListener('mousedown', () => {
+            leftPressed = true;
+        });
+        
+        leftBtn.addEventListener('mouseup', () => {
+            leftPressed = false;
+        });
+        
+        leftBtn.addEventListener('mouseleave', () => {
+            leftPressed = false;
+        });
+        
+        rightBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            rightPressed = true;
+        });
+        
+        rightBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            rightPressed = false;
+        });
+        
+        rightBtn.addEventListener('mousedown', () => {
+            rightPressed = true;
+        });
+        
+        rightBtn.addEventListener('mouseup', () => {
+            rightPressed = false;
+        });
+        
+        rightBtn.addEventListener('mouseleave', () => {
+            rightPressed = false;
+        });
+        
+        jumpBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (player.grounded && gameRunning) {
+                player.velY = -player.jumpPower;
+                player.grounded = false;
+                player.jumping = true;
             }
-        }
-
-        // Генерация врагов
-        function generateEnemies() {
-            for (let i = 0; i < enemyCount; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const distance = 500 + Math.random() * 1500;
-                const x = player.x + Math.cos(angle) * distance;
-                const y = player.y + Math.sin(angle) * distance;
-                
-                const colors = ['#FF5252', '#FFEB3B', '#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#E91E63'];
-                const color = colors[Math.floor(Math.random() * colors.length)];
-                const size = 15 + Math.random() * 10;
-                
-                enemies.push({
-                    x: x,
-                    y: y,
-                    radius: size,
-                    speed: 1.5 + Math.random() * 2,
-                    angle: angle,
-                    tail: [],
-                    length: 15 + Math.floor(Math.random() * 40),
-                    color: color,
-                    name: `Bot${Math.floor(Math.random() * 1000)}`,
-                    score: Math.floor(Math.random() * 200),
-                    segments: [],
-                    mass: size,
-                    isBot: true
-                });
+        });
+        
+        jumpBtn.addEventListener('mousedown', () => {
+            if (player.grounded && gameRunning) {
+                player.velY = -player.jumpPower;
+                player.grounded = false;
+                player.jumping = true;
             }
-        }
-
-        // Обновление хвоста
-        function updateTail(entity) {
-            entity.tail.unshift({ x: entity.x, y: entity.y });
-            if (entity.tail.length > entity.length) {
-                entity.tail.pop();
-            }
+        });
+        
+        // Физика
+        const gravity = 0.8;
+        const friction = 0.9;
+        
+        // Обновление игры
+        function update() {
+            if (!gameRunning) return;
             
-            // Создание сегментов для плавного хвоста
-            entity.segments = [];
-            for (let i = 0; i < entity.tail.length; i++) {
-                const prev = i === 0 ? {x: entity.x, y: entity.y} : entity.tail[i-1];
-                const curr = entity.tail[i];
-                
-                const radius = entity.radius * (0.4 + 0.6 * (1 - i / entity.length));
-                entity.segments.push({
-                    x: curr.x,
-                    y: curr.y,
-                    radius: radius,
-                    mass: radius
-                });
-            }
-        }
-
-        // Проверка столкновений
-        function checkCollision(x1, y1, r1, x2, y2, r2) {
-            const dx = x1 - x2;
-            const dy = y1 - y2;
-            return dx * dx + dy * dy < (r1 + r2) * (r1 + r2);
-        }
-
-        // Преобразование мировых координат в экранные
-        function worldToScreen(x, y) {
-            return {
-                x: (x - camera.x) * camera.zoom + camera.width / 2,
-                y: (y - camera.y) * camera.zoom + camera.height / 2
-            };
-        }
-
-        // Отрисовка круга с учетом камеры
-        function drawCircle(x, y, radius, color) {
-            const screenPos = worldToScreen(x, y);
-            const screenRadius = radius * camera.zoom;
-            
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(screenPos.x, screenPos.y, screenRadius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        // Отрисовка сегментов хвоста
-        function drawTailSegments(entity) {
-            for (let i = 0; i < entity.segments.length; i++) {
-                const segment = entity.segments[i];
-                const screenPos = worldToScreen(segment.x, segment.y);
-                const screenRadius = segment.radius * camera.zoom;
-                
-                // Градиент для хвоста
-                const gradient = ctx.createRadialGradient(
-                    screenPos.x, screenPos.y, 0,
-                    screenPos.x, screenPos.y, screenRadius
-                );
-                gradient.addColorStop(0, entity.color);
-                gradient.addColorStop(1, adjustBrightness(entity.color, -0.3));
-                
-                ctx.fillStyle = gradient;
-                ctx.beginPath();
-                ctx.arc(screenPos.x, screenPos.y, screenRadius, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        // Изменение яркости цвета
-        function adjustBrightness(color, amount) {
-            const hex = color.replace('#', '');
-            const r = parseInt(hex.substr(0, 2), 16);
-            const g = parseInt(hex.substr(2, 2), 16);
-            const b = parseInt(hex.substr(4, 2), 16);
-
-            const newR = Math.max(0, Math.min(255, r + Math.round(255 * amount)));
-            const newG = Math.max(0, Math.min(255, g + Math.round(255 * amount)));
-            const newB = Math.max(0, Math.min(255, b + Math.round(255 * amount)));
-
-            return `#${((newR << 16) | (newG << 8) | newB).toString(16).padStart(6, '0')}`;
-        }
-
-        // Отрисовка имени игрока
-        function drawName(entity) {
-            if (!entity.name) return;
-            
-            const screenPos = worldToScreen(entity.x, entity.y);
-            const fontSize = Math.max(12, entity.radius * camera.zoom * 0.8);
-            
-            ctx.font = `${fontSize}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.fillStyle = '#FFFFFF';
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 2 * camera.zoom;
-            ctx.strokeText(entity.name, screenPos.x, screenPos.y - entity.radius * camera.zoom - 5);
-            ctx.fillText(entity.name, screenPos.x, screenPos.y - entity.radius * camera.zoom - 5);
-            
-            // Отрисовка счета для топ игроков
-            if (entity.score > 50) {
-                ctx.font = `${fontSize * 0.8}px Arial`;
-                ctx.strokeText(entity.score, screenPos.x, screenPos.y - entity.radius * camera.zoom - 15 - fontSize * 0.5);
-                ctx.fillText(entity.score, screenPos.x, screenPos.y - entity.radius * camera.zoom - 15 - fontSize * 0.5);
-            }
-        }
-
-        // Обновление списка лидеров
-        function updateLeaderboard() {
-            // Создаем массив всех игроков (игрок + враги)
-            const allPlayers = [player, ...enemies];
-            
-            // Сортируем по убыванию счета
-            const sortedPlayers = [...allPlayers].sort((a, b) => b.score - a.score);
-            
-            // Берем топ-5
-            gameState.topPlayers = sortedPlayers.slice(0, 5);
-            
-            // Обновляем отображение
-            leaderboardEntries.innerHTML = '';
-            gameState.topPlayers.forEach((p, index) => {
-                const entry = document.createElement('div');
-                entry.className = `leaderboard-entry ${p === player ? 'leaderboard-you' : ''}`;
-                entry.innerHTML = `
-                    <span>${index + 1}. ${p.name}</span>
-                    <span>${p.score}</span>
-                `;
-                leaderboardEntries.appendChild(entry);
-            });
-        }
-
-        // Проверка убийства бота
-        function checkKillEnemies() {
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                const enemy = enemies[i];
-                
-                // Проверяем столкновение головы игрока с телом бота
-                for (let j = 1; j < enemy.tail.length; j++) {
-                    if (checkCollision(
-                        player.x, player.y, player.radius,
-                        enemy.tail[j].x, enemy.tail[j].y, enemy.radius * 0.8
-                    )) {
-                        // Игрок убил бота - добавляем очки и удаляем бота
-                        player.score += Math.floor(enemy.score * 0.5);
-                        player.length += Math.floor(enemy.length * 0.3);
-                        
-                        // Создаем еду из останков бота
-                        createFoodFromEnemy(enemy);
-                        
-                        enemies.splice(i, 1);
-                        scoreElement.textContent = `Score: ${player.score}`;
-                        break;
-                    }
-                }
-                
-                // Проверяем столкновение тела игрока с головой бота
-                for (let j = 1; j < player.tail.length; j++) {
-                    if (checkCollision(
-                        enemy.x, enemy.y, enemy.radius,
-                        player.tail[j].x, player.tail[j].y, player.radius * 0.8
-                    )) {
-                        // Бот убит телом игрока
-                        player.score += Math.floor(enemy.score * 0.5);
-                        player.length += Math.floor(enemy.length * 0.3);
-                        
-                        // Создаем еду из останков бота
-                        createFoodFromEnemy(enemy);
-                        
-                        enemies.splice(i, 1);
-                        scoreElement.textContent = `Score: ${player.score}`;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Создание еды из убитого врага
-        function createFoodFromEnemy(enemy) {
-            const pieces = 10 + Math.floor(enemy.mass / 5);
-            for (let i = 0; i < pieces; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const distance = Math.random() * enemy.radius * 2;
-                
-                food.push({
-                    x: enemy.x + Math.cos(angle) * distance,
-                    y: enemy.y + Math.sin(angle) * distance,
-                    radius: 5 + Math.random() * 5,
-                    color: enemy.color,
-                    mass: 1
-                });
-            }
-        }
-
-        // Основной цикл игры
-        function gameLoop() {
-            if (!gameState.started) return;
-
-            // Очистка экрана
-            ctx.fillStyle = 'black';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Масштабирование камеры в зависимости от размера игрока
-            camera.zoom = Math.min(2, Math.max(0.5, 1 / (1 + player.mass * 0.005)));
-            
-            // Обновление камеры (плавное следование за игроком)
-            camera.x += (player.x - camera.x) * 0.1;
-            camera.y += (player.y - camera.y) * 0.1;
-
-            // Управление игроком (упрощенное)
-            if (window.mouseX !== undefined && window.mouseY !== undefined) {
-                const screenCenter = worldToScreen(player.x, player.y);
-                const targetAngle = Math.atan2(
-                    screenCenter.y - window.mouseY,
-                    screenCenter.x - window.mouseX
-                );
-                
-                // Плавное изменение угла с учетом чувствительности
-                const angleDiff = ((targetAngle - player.angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-                player.angle += angleDiff * gameState.controlSensitivity * 0.1;
-            }
-
-            // Ускорение (boost)
-            const currentTime = Date.now();
-            if (gameState.isBoosting && gameState.boost > 0) {
-                player.speed = player.boostSpeed;
-                gameState.boost = Math.max(0, gameState.boost - 0.5);
-                boostBar.style.width = `${gameState.boost}%`;
-            } else {
-                player.speed = 4;
-                if (currentTime - gameState.lastBoostTime > 100 && gameState.boost < 100) {
-                    gameState.boost = Math.min(100, gameState.boost + 0.2);
-                    boostBar.style.width = `${gameState.boost}%`;
-                    gameState.lastBoostTime = currentTime;
-                }
-            }
-
             // Движение игрока
-            player.x -= Math.cos(player.angle) * player.speed;
-            player.y -= Math.sin(player.angle) * player.speed;
-
-            // Обновление хвоста игрока
-            updateTail(player);
-
-            // Отрисовка хвоста игрока
-            drawTailSegments(player);
-
-            // Отрисовка головы игрока
-            drawCircle(player.x, player.y, player.radius, player.color);
-            drawName(player);
-
-            // Проверка сбора еды
-            for (let i = food.length - 1; i >= 0; i--) {
-                if (checkCollision(player.x, player.y, player.radius, food[i].x, food[i].y, food[i].radius)) {
-                    player.length += 2;
-                    player.score += 1;
-                    player.mass += 0.1;
-                    scoreElement.textContent = `Score: ${player.score}`;
-                    food.splice(i, 1);
+            player.velX = 0;
+            
+            if (leftPressed) player.velX = -player.speed;
+            if (rightPressed) player.velX = player.speed;
+            
+            // Применяем гравитацию
+            player.velY += gravity;
+            
+            // Применяем трение по горизонтали
+            player.velX *= friction;
+            
+            // Обновляем позицию игрока
+            player.x += player.velX;
+            player.y += player.velY;
+            
+            // Ограничиваем игрока в пределах canvas
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+            
+            // Проверка на падение за пределы
+            if (player.y > canvas.height) {
+                player.x = 100;
+                player.y = 300;
+                player.velX = 0;
+                player.velY = 0;
+                loseLife();
+            }
+            
+            // Сброс прыжка при приземлении
+            if (player.grounded) {
+                player.jumping = false;
+            }
+            
+            // Проверка коллизий с платформами
+            player.grounded = false;
+            
+            for (let i = 0; i < platforms.length; i++) {
+                const platform = platforms[i];
+                
+                // Проверяем столкновение
+                if (player.x < platform.x + platform.width &&
+                    player.x + player.width > platform.x &&
+                    player.y < platform.y + platform.height &&
+                    player.y + player.height > platform.y) {
                     
-                    // Добавляем новую еду в случайном месте мира
-                    const angle = Math.random() * Math.PI * 2;
-                    const distance = 500 + Math.random() * 1500;
-                    food.push({
-                        x: player.x + Math.cos(angle) * distance,
-                        y: player.y + Math.sin(angle) * distance,
-                        radius: 8,
-                        color: `hsl(${Math.random() * 360}, 100%, 50%)`,
-                        mass: 1
-                    });
+                    // Определяем направление столкновения
+                    const topCollision = Math.abs((player.y + player.height) - platform.y) < 10;
+                    const bottomCollision = Math.abs(player.y - (platform.y + platform.height)) < 10;
+                    const leftCollision = Math.abs((player.x + player.width) - platform.x) < 10;
+                    const rightCollision = Math.abs(player.x - (platform.x + platform.width)) < 10;
+                    
+                    // Обрабатываем столкновение сверху (приземление на платформу)
+                    if (topCollision && player.velY > 0) {
+                        player.y = platform.y - player.height;
+                        player.velY = 0;
+                        player.grounded = true;
+                    }
+                    // Столкновение снизу
+                    else if (bottomCollision && player.velY < 0) {
+                        player.y = platform.y + platform.height;
+                        player.velY = 0;
+                    }
+                    // Столкновение слева
+                    else if (leftCollision && player.velX > 0) {
+                        player.x = platform.x - player.width;
+                        player.velX = 0;
+                    }
+                    // Столкновение справа
+                    else if (rightCollision && player.velX < 0) {
+                        player.x = platform.x + platform.width;
+                        player.velX = 0;
+                    }
                 }
             }
-
-            // Отрисовка еды
-            food.forEach(f => {
-                drawCircle(f.x, f.y, f.radius, f.color);
-            });
-
-            // Движение и отрисовка врагов
-            enemies.forEach(enemy => {
-                // ИИ врагов - простой патруль с небольшим преследованием игрока
-                if (Math.random() < 0.02) {
-                    if (Math.random() < 0.3 && player.score > 10) {
-                        // Иногда преследуют игрока (если он достаточно большой)
-                        enemy.angle = Math.atan2(
-                            player.y - enemy.y,
-                            player.x - enemy.x
-                        );
+            
+            // Проверка сбора монет
+            for (let i = 0; i < coins.length; i++) {
+                const coin = coins[i];
+                
+                if (!coin.collected) {
+                    const dx = player.x + player.width/2 - coin.x;
+                    const dy = player.y + player.height/2 - coin.y;
+                    const distance = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (distance < player.width/2 + coin.radius) {
+                        coin.collected = true;
+                        score += 10;
+                        scoreElement.textContent = score;
                         
-                        // Избегаем столкновений с более крупными змейками
-                        if (player.mass > enemy.mass * 1.5) {
-                            enemy.angle += Math.PI; // Разворачиваемся от игрока
+                        // Проверка на переход на следующий уровень
+                        if (coins.every(c => c.collected)) {
+                            nextLevel();
                         }
-                    } else {
-                        // Или просто случайное движение
-                        enemy.angle += (Math.random() - 0.5) * 1.5;
                     }
                 }
-
-                enemy.x += Math.cos(enemy.angle) * enemy.speed;
-                enemy.y += Math.sin(enemy.angle) * enemy.speed;
-
-                // Обновление хвоста врага
-                updateTail(enemy);
-
-                // Отрисовка хвоста врага
-                drawTailSegments(enemy);
-
-                // Отрисовка головы врага
-                drawCircle(enemy.x, enemy.y, enemy.radius, enemy.color);
-                drawName(enemy);
-
-                // Проверка столкновения головы врага с головой игрока
-                if (checkCollision(player.x, player.y, player.radius, 
-                                 enemy.x, enemy.y, enemy.radius)) {
-                    if (player.mass > enemy.mass * 1.2) {
-                        // Игрок больше - убиваем врага
-                        player.score += Math.floor(enemy.score * 0.5);
-                        player.length += Math.floor(enemy.length * 0.3);
-                        createFoodFromEnemy(enemy);
-                        enemies.splice(enemies.indexOf(enemy), 1);
-                        scoreElement.textContent = `Score: ${player.score}`;
-                    } else if (enemy.mass > player.mass * 1.2) {
-                        // Враг больше - игрок погибает
-                        gameOver();
-                        return;
-                    }
-                }
-
-                // Враги тоже собирают еду
-                for (let i = food.length - 1; i >= 0; i--) {
-                    if (checkCollision(enemy.x, enemy.y, enemy.radius, food[i].x, food[i].y, food[i].radius)) {
-                        enemy.length += 2;
-                        enemy.score += 1;
-                        enemy.mass += 0.1;
-                        food.splice(i, 1);
-                        break;
-                    }
-                }
-            });
-
-            // Проверка убийства ботов
-            checkKillEnemies();
-
-            // Респавн врагов, если их стало мало
-            if (enemies.length < enemyCount * 0.5) {
-                generateEnemies();
             }
-
-            // Обновление списка лидеров
-            updateLeaderboard();
-
+            
+            // Проверка столкновений с препятствиями
+            for (let i = 0; i < obstacles.length; i++) {
+                const obstacle = obstacles[i];
+                
+                if (player.x < obstacle.x + obstacle.width &&
+                    player.x + player.width > obstacle.x &&
+                    player.y < obstacle.y + obstacle.height &&
+                    player.y + player.height > obstacle.y) {
+                    
+                    // Столкновение с препятствием
+                    player.x = 100;
+                    player.y = 300;
+                    player.velX = 0;
+                    player.velY = 0;
+                    loseLife();
+                    break;
+                }
+            }
+        }
+        
+        // Отображение игры
+        function draw() {
+            // Очистка canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Рисуем фон
+            ctx.fillStyle = '#0f3460';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Рисуем платформы
+            for (let i = 0; i < platforms.length; i++) {
+                const platform = platforms[i];
+                ctx.fillStyle = platform.color;
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                
+                // Добавляем тень для платформ
+                ctx.strokeStyle = '#3a0ca3';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+            }
+            
+            // Рисуем монеты
+            for (let i = 0; i < coins.length; i++) {
+                const coin = coins[i];
+                
+                if (!coin.collected) {
+                    // Основной цвет монеты
+                    ctx.fillStyle = coin.color;
+                    ctx.beginPath();
+                    ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Блик на монете
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.arc(coin.x - coin.radius/3, coin.y - coin.radius/3, coin.radius/3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            // Рисуем препятствия
+            for (let i = 0; i < obstacles.length; i++) {
+                const obstacle = obstacles[i];
+                ctx.fillStyle = obstacle.color;
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+                
+                // Добавляем текстуру препятствиям
+                ctx.fillStyle = '#b5179e';
+                ctx.fillRect(obstacle.x + 5, obstacle.y + 5, obstacle.width - 10, obstacle.height - 10);
+            }
+            
+            // Рисуем игрока
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            
+            // Добавляем глаза игроку
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(player.x + player.width/3, player.y + 10, 5, 5);
+            ctx.fillRect(player.x + 2*player.width/3, player.y + 10, 5, 5);
+            
+            // Добавляем улыбку
+            ctx.beginPath();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.arc(player.x + player.width/2, player.y + 25, 8, 0, Math.PI);
+            ctx.stroke();
+            
+            // Если игра не запущена, показываем сообщение
+            if (!gameRunning) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width/2, canvas.height/2 - 30);
+                
+                ctx.font = '24px Arial';
+                ctx.fillText(`Финальный счет: ${score}`, canvas.width/2, canvas.height/2 + 30);
+                
+                ctx.font = '20px Arial';
+                ctx.fillText('Обновите страницу, чтобы начать заново', canvas.width/2, canvas.height/2 + 80);
+            }
+        }
+        
+        // Игровой цикл
+        function gameLoop() {
+            update();
+            draw();
             requestAnimationFrame(gameLoop);
         }
-
-        // Конец игры
-        function gameOver() {
-            gameState.started = false;
-            finalScoreElement.textContent = `Score: ${player.score}`;
-            gameOverElement.style.display = 'flex';
-            leaderboardElement.style.display = 'none';
-            boostElement.style.display = 'none';
+        
+        // Потеря жизни
+        function loseLife() {
+            lives--;
+            livesElement.textContent = lives;
+            
+            if (lives <= 0) {
+                gameRunning = false;
+            }
         }
-
-        // Сброс игры
-        function resetGame() {
-            player = {
-                x: 0,
-                y: 0,
-                radius: 15,
-                speed: 4,
-                boostSpeed: 7,
-                angle: 0,
-                tail: [],
-                segments: [],
-                length: 10,
-                score: 0,
-                color: gameState.playerColor,
-                name: gameState.nickname || 'Player',
-                mass: 15
-            };
-            food = [];
-            enemies = [];
-            gameState.boost = 100;
-            boostBar.style.width = '100%';
-            generateFood();
-            generateEnemies();
-            scoreElement.textContent = 'Score: 0';
-        }
-
-        // Обработчики событий
-        startBtn.addEventListener('click', () => {
-            gameState.nickname = nicknameInput.value.trim() || 'Player';
-            gameState.playerColor = selectedColor;
-            gameState.started = true;
-            menuElement.style.display = 'none';
-            boostElement.style.display = 'block';
-            leaderboardElement.style.display = 'block';
-            resetGame();
-            gameLoop();
-        });
-
-        playAgainBtn.addEventListener('click', () => {
-            gameOverElement.style.display = 'none';
-            gameState.started = true;
-            boostElement.style.display = 'block';
-            leaderboardElement.style.display = 'block';
-            resetGame();
-            gameLoop();
-        });
-
-        instructionsBtn.addEventListener('click', () => {
-            alert("HOW TO PLAY:\n\n1. Move your mouse to control your snake\n2. Press SPACE or LEFT MOUSE BUTTON to boost\n3. Eat colored dots to grow\n4. Kill other snakes by making them crash into your body\n5. Avoid crashing into bigger snakes\n\nTOP PLAYERS are displayed in the leaderboard on the right.");
-        });
-
-        // Управление ускорением
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && gameState.started) {
-                e.preventDefault();
-                gameState.isBoosting = true;
-            }
-        });
-
-        document.addEventListener('keyup', (e) => {
-            if (e.code === 'Space') {
-                gameState.isBoosting = false;
-            }
-        });
-
-        canvas.addEventListener('mousedown', () => {
-            if (gameState.started) {
-                gameState.isBoosting = true;
-            }
-        });
-
-        canvas.addEventListener('mouseup', () => {
-            gameState.isBoosting = false;
-        });
-
-        canvas.addEventListener('touchstart', () => {
-            if (gameState.started) {
-                gameState.isBoosting = true;
-            }
-        });
-
-        canvas.addEventListener('touchend', () => {
-            gameState.isBoosting = false;
-        });
-
-        // Отслеживание мыши/касания
-        window.mouseX = undefined;
-        window.mouseY = undefined;
-
-        canvas.addEventListener('mousemove', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            window.mouseX = e.clientX - rect.left;
-            window.mouseY = e.clientY - rect.top;
-        });
-
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            window.mouseX = touch.clientX - rect.left;
-            window.mouseY = touch.clientY - rect.top;
-        }, { passive: false });
-
-        // Инициализация
-        boostElement.style.display = 'none';
-        leaderboardElement.style.display = 'none';
-        generateFood();
-        generateEnemies();
-    </script>
-</body>
-</html>
+        
+        // Следующий уровень
+        function nextLevel() {
+            level++;
+            levelElement.textContent = level;
+            
+            // Увеличиваем скорость
+            player.speed += 0.5;
+            
+            // Создаем новые монеты на более высоких позициях
+            coins = [];
+            for (let i = 0; i < 7; i++) {
+                coins.push({
+                    x: 100 + i * 100,
+                    y: 100 + Math.random() * 200,
+                    radius: 10,
+                    color: '#ffd166',
+                    collected: 

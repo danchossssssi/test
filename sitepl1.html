@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Бой с NPC</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+        
+        body {
+            background: #111;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+        
+        #gameCanvas {
+            width: 100%;
+            height: 70vh;
+            background: #222;
+            display: block;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 20px;
+            width: 100%;
+            background: #333;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            width: 80px;
+            height: 80px;
+            background: #444;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 24px;
+            touch-action: manipulation;
+        }
+        
+        .btn:active {
+            background: #666;
+        }
+        
+        .btn.attack {
+            background: #c44;
+        }
+        
+        .btn.attack:active {
+            background: #e66;
+        }
+        
+        .btn.defend {
+            background: #44c;
+        }
+        
+        .btn.defend:active {
+            background: #66e;
+        }
+        
+        .info {
+            background: #333;
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            width: 90%;
+            max-width: 500px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .hp-bar {
+            width: 100px;
+            height: 20px;
+            background: #444;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-left: 10px;
+        }
+        
+        .hp-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s;
+        }
+        
+        .npc-hp-fill {
+            background: #f44336;
+        }
+        
+        .dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #666;
+            display: none;
+            z-index: 100;
+            width: 90%;
+            max-width: 400px;
+        }
+        
+        .dialog-content {
+            margin-bottom: 15px;
+        }
+        
+        .close-btn {
+            padding: 8px 16px;
+            background: #666;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        
+        .battle-controls {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <div>Игрок HP: <span id="playerHP">100</span></div>
+        <div class="hp-bar"><div class="hp-fill" id="playerHPBar" style="width: 100%"></div></div>
+    </div>
+    
+    <div class="info">
+        <div>NPC HP: <span id="npcHP">100</span></div>
+        <div class="hp-bar"><div class="hp-fill npc-hp-fill" id="npcHPBar" style="width: 100%"></div></div>
+    </div>
+    
+    <canvas id="gameCanvas"></canvas>
+    
+    <div class="controls" id="moveControls">
+        <button class="btn" id="leftBtn">←</button>
+        <button class="btn" id="jumpBtn">↑</button>
+        <button class="btn" id="rightBtn">→</button>
+    </div>
+    
+    <div class="controls battle-controls" id="battleControls">
+        <button class="btn attack" id="attackBtn">⚔️ Атака</button>
+        <button class="btn defend" id="defendBtn">🛡️ Защита</button>
+        <button class="btn" id="runBtn">🏃 Бежать</button>
+    </div>
+    
+    <div class="dialog" id="dialog">
+        <div class="dialog-content" id="dialogText">Текст диалога...</div>
+        <button class="close-btn" id="closeDialog">Далее</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Размеры
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight * 0.7;
+        
+        // Состояние игры
+        let gameState = 'explore'; // explore, dialogue, battle
+        
+        // Игрок
+        const player = {
+            x: 100,
+            y: 0,
+            width: 40,
+            height: 60,
+            color: '#4CAF50',
+            speed: 5,
+            velX: 0,
+            velY: 0,
+            jumpPower: 15,
+            grounded: true,
+            hp: 100,
+            maxHP: 100,
+            attack: 20,
+            defense: false
+        };
+        
+        // Платформа
+        const platform = {
+            x: 0,
+            y: canvas.height - 100,
+            width: canvas.width,
+            height: 50,
+            color: '#795548'
+        };
+        
+        // NPC
+        const npc = {
+            x: canvas.width - 150,
+            y: 0,
+            width: 40,
+            height: 60,
+            color: '#FF9800',
+            hp: 100,
+            maxHP: 100,
+            attack: 15,
+            canTalk: false,
+            dialogue: [
+                "Ха! Ты осмелился подойти ко мне?",
+                "Сейчас я научу тебя уважению!",
+                "Готовься к бою!"
+            ],
+            currentDialogue: 0
+        };
+        
+        // Позиционируем
+        player.y = platform.y - player.height;
+        npc.y = platform.y - npc.height;
+        
+        // Элементы интерфейса
+        const playerHP = document.getElementById('playerHP');
+        const playerHPBar = document.getElementById('playerHPBar');
+        const npcHP = document.getElementById('npcHP');
+        const npcHPBar = document.getElementById('npcHPBar');
+        const dialog = document.getElementById('dialog');
+        const dialogText = document.getElementById('dialogText');
+        const closeDialog = document.getElementById('closeDialog');
+        const moveControls = document.getElementById('moveControls');
+        const battleControls = document.getElementById('battleControls');
+        
+        // Кнопки движения
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+        const jumpBtn = document.getElementById('jumpBtn');
+        
+        // Кнопки боя
+        const attackBtn = document.getElementById('attackBtn');
+        const defendBtn = document.getElementById('defendBtn');
+        const runBtn = document.getElementById('runBtn');
+        
+        let leftPressed = false;
+        let rightPressed = false;
+        
+        // Управление движением
+        leftBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'explore') leftPressed = true;
+        });
+        leftBtn.addEventListener('touchend', () => leftPressed = false);
+        
+        rightBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'explore') rightPressed = true;
+        });
+        rightBtn.addEventListener('touchend', () => rightPressed = false);
+        
+        jumpBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'explore' && player.grounded) {
+                player.velY = -player.jumpPower;
+                player.grounded = false;
+            }
+        });
+        
+        // Управление боем
+        attackBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'battle') playerAttack();
+        });
+        
+        defendBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'battle') {
+                player.defense = true;
+                setTimeout(() => player.defense = false, 1000);
+                npcAttack();
+            }
+        });
+        
+        runBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'battle') {
+                endBattle();
+            }
+        });
+        
+        // Диалог
+        closeDialog.addEventListener('click', () => {
+            if (npc.currentDialogue < npc.dialogue.length - 1) {
+                npc.currentDialogue++;
+                showDialog(npc.dialogue[npc.currentDialogue]);
+            } else {
+                dialog.style.display = 'none';
+                startBattle();
+            }
+        });
+        
+        // Физика
+        const gravity = 0.8;
+        
+        // Обновление
+        function update() {
+            if (gameState !== 'explore') return;
+            
+            // Движение
+            player.velX = 0;
+            if (leftPressed) player.velX = -player.speed;
+            if (rightPressed) player.velX = player.speed;
+            
+            // Гравитация
+            player.velY += gravity;
+            
+            // Позиция
+            player.x += player.velX;
+            player.y += player.velY;
+            
+            // Границы
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) {
+                player.x = canvas.width - player.width;
+            }
+            
+            // Если упал
+            if (player.y > canvas.height) {
+                resetPlayer();
+            }
+            
+            // Коллизия с платформой
+            player.grounded = false;
+            if (player.x < platform.x + platform.width &&
+                player.x + player.width > platform.x &&
+                player.y < platform.y + platform.height &&
+                player.y + player.height > platform.y) {
+                
+                if (player.velY > 0) {
+                    player.y = platform.y - player.height;
+                    player.velY = 0;
+                    player.grounded = true;
+                }
+            }
+            
+            // Взаимодействие с NPC
+            const distance = Math.abs(player.x - npc.x);
+            npc.canTalk = distance < 100 && player.grounded;
+            
+            if (npc.canTalk && gameState === 'explore') {
+                canvas.addEventListener('touchstart', startDialogue, {once: true});
+            }
+        }
+        
+        function startDialogue() {
+            gameState = 'dialogue';
+            npc.currentDialogue = 0;
+            showDialog(npc.dialogue[0]);
+        }
+        
+        function showDialog(text) {
+            dialogText.textContent = text;
+            dialog.style.display = 'block';
+        }
+        
+        function startBattle() {
+            gameState = 'battle';
+            moveControls.style.display = 'none';
+            battleControls.style.display = 'flex';
+        }
+        
+        function playerAttack() {
+            // Атака игрока
+            const damage = player.attack;
+            npc.hp -= damage;
+            if (npc.hp < 0) npc.hp = 0;
+            
+            updateHPBars();
+            
+            if (npc.hp <= 0) {
+                setTimeout(() => {
+                    alert("Вы победили NPC!");
+                    endBattle();
+                    npc.hp = npc.maxHP; // Восстанавливаем NPC
+                    updateHPBars();
+                }, 300);
+                return;
+            }
+            
+            // Ответная атака NPC
+            setTimeout(() => npcAttack(), 500);
+        }
+        
+        function npcAttack() {
+            if (npc.hp <= 0) return;
+            
+            let damage = npc.attack;
+            if (player.defense) {
+                damage = Math.floor(damage / 2);
+            }
+            
+            player.hp -= damage;
+            if (player.hp < 0) player.hp = 0;
+            
+            updateHPBars();
+            
+            if (player.hp <= 0) {
+                setTimeout(() => {
+                    alert("Вы проиграли!");
+                    endBattle();
+                    player.hp = player.maxHP; // Восстанавливаем игрока
+                    updateHPBars();
+                }, 300);
+            }
+        }
+        
+        function updateHPBars() {
+            playerHP.textContent = player.hp;
+            npcHP.textContent = npc.hp;
+            
+            const playerHPPercent = (player.hp / player.maxHP) * 100;
+            const npcHPPercent = (npc.hp / npc.maxHP) * 100;
+            
+            playerHPBar.style.width = playerHPPercent + '%';
+            npcHPBar.style.width = npcHPPercent + '%';
+        }
+        
+        function endBattle() {
+            gameState = 'explore';
+            moveControls.style.display = 'flex';
+            battleControls.style.display = 'none';
+        }
+        
+        function resetPlayer() {
+            player.x = 100;
+            player.y = platform.y - player.height;
+            player.velX = 0;
+            player.velY = 0;
+            player.grounded = true;
+        }
+        
+        // Отрисовка
+        function draw() {
+            // Очистка
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Платформа
+            ctx.fillStyle = platform.color;
+            ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+            
+            // NPC
+            ctx.fillStyle = npc.color;
+            ctx.fillRect(npc.x, npc.y, npc.width, npc.height);
+            
+            // HP над NPC
+            ctx.fillStyle = 'white';
+            ctx.font = '14px Arial';
+            ctx.fillText(`${npc.hp}/${npc.maxHP}`, npc.x, npc.y - 10);
+            
+            // Игрок
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            
+            // HP над игроком
+            ctx.fillStyle = 'white';
+            ctx.fillText(`${player.hp}/${player.maxHP}`, player.x, player.y - 10);
+            
+            // Индикатор разговора
+            if (npc.canTalk && gameState === 'explore') {
+                ctx.fillStyle = '#FFEB3B';
+                ctx.font = '16px Arial';
+                ctx.fillText('Нажмите для разговора', npc.x - 40, npc.y - 30);
+            }
+            
+            // Индикатор защиты
+            if (player.defense) {
+                ctx.fillStyle = 'rgba(0, 100, 255, 0.5)';
+                ctx.fillRect(player.x - 5, player.y - 5, player.width + 10, player.height + 10);
+            }
+        }
+        
+        // Игровой цикл
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Запуск
+        updateHPBars();
+        gameLoop();
+    </script>
+</body>
+</html>
